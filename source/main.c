@@ -139,7 +139,6 @@ int main(int argc, char** argv) {
 
             // Sample offset
             sample_offsets[n_samples] = sample_stack_cursor - sample_stack;
-            printf("%s: %i\n", sample_path, sample_offsets[n_samples]);
 
             // Instrument region
             inst_regions[n_samples] = (InstRegion){
