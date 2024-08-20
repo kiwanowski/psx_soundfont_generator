@@ -61,11 +61,22 @@ int read_riff_chunk(FILE** file, char* name, uint32_t* size) {
 }
 
 WaveFile load_wav(const char* path) {
+    // We will gather this information
+    WavHeader header;
+    SamplerChunk sampler;
+    WaveFile wave = {
+        .samples = NULL,
+        .sample_rate = 0,
+        .length = -1,
+        .loop_start = -1,
+        .loop_end = -1,
+    };
+
     // Open file
     FILE* file = fopen(path, "rb");
     if (file == NULL) {
         printf("Failed to open file %s\n", path);
-        return;
+        return wave;
     }
     
     char name[5] = {0};
@@ -82,17 +93,6 @@ WaveFile load_wav(const char* path) {
         printf("Invalid WAVE file\n");
     }
 
-    // We will gather this information
-    WavHeader header;
-    SamplerChunk sampler;
-    WaveFile wave = {
-        .samples = NULL,
-        .sample_rate = 0,
-        .length = -1,
-        .loop_start = -1,
-        .loop_end = -1,
-    };
-
     while(1) {
         if (!read_riff_chunk(&file, name, &size)) break;
 
@@ -104,11 +104,11 @@ WaveFile load_wav(const char* path) {
             // Do we support this? if not, bail
             if (header.num_channels != 1) {
                 printf("Only mono samples are supported for now!");
-                return;
+                return wave;
             }
             if (header.bits_per_sample != 16) {
                 printf("Only 16-bit samples are supported for now!");
-                return;
+                return wave;
             }
 
             wave.sample_rate = header.sample_rate;
