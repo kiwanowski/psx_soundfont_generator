@@ -24,8 +24,8 @@ int main(int argc, char** argv) {
     const char* out_path = argv[2];
 
     // The PS1 has 512 KB of sound RAM, I allocate 380 KB for music instruments
-    const uint8_t* scratch_buffer = malloc(380 * 1024);
-    const uint8_t* sample_stack = malloc(380 * 1024); 
+    uint8_t* scratch_buffer = malloc(380 * 1024);
+    uint8_t* sample_stack = malloc(380 * 1024); 
     uint8_t* sample_stack_cursor = sample_stack;
     uint32_t sample_offsets[1024] = {0};
     char* sample_names[1024] = { 0 };
