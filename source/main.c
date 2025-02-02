@@ -3,15 +3,18 @@
 #include <stdlib.h>
 
 typedef struct {
-    uint8_t key_min;                // Minimum MIDI key for this instrument region
-    uint8_t key_max;                // Maximum MIDI key for this instrument region
-    uint16_t volume_multiplier;     // @8.8 fixed point volume multiplier
-    uint32_t sample_start;          // Offset (bytes) into sample data chunk. Can be written to SPU Sample Start Address
-    uint32_t sample_rate;           // Sample rate (Hz) at MIDI key 60 (C5)
-    uint16_t reg_adsr1;             // Raw data to be written to SPU_CH_ADSR1 when enabling a note
-    uint16_t reg_adsr2;             // Raw data to be written to SPU_CH_ADSR2 when enabling a note
-    uint8_t panning;
-    uint8_t _pad[3];
+    uint32_t sample_start;  // Offset (bytes) into sample data chunk. Can be written to SPU Sample Start Address |
+    uint32_t sample_rate;   // Sample rate (Hz) at MIDI key 60 (C5)                                              |
+    uint16_t delay;         // Delay stage length in milliseconds                                                |
+    uint16_t attack;        // Attack stage length in milliseconds                                               |
+    uint16_t hold;          // Hold stage length in milliseconds                                                 |
+    uint16_t decay;         // Decay stage length in milliseconds                                                |
+    uint16_t sustain;       // Sustain volume where 0 = 0.0 and 65535 = 1.0                                      |
+    uint16_t release;       // Release stage length in milliseconds                                              |
+    uint16_t volume;        // Panning for this region, 0 = left, 127 = middle, 254 = right                      |
+    uint16_t panning;       // Panning for this region, 0 = left, 127 = middle, 254 = right                      |
+    uint8_t key_min;        // Minimum MIDI key for this instrument region                                       |
+    uint8_t key_max;        // Maximum MIDI key for this instrument region         
 } InstRegion;
 
 int main(int argc, char** argv) {
@@ -72,39 +75,27 @@ int main(int argc, char** argv) {
             unsigned int instrument_id;
             unsigned int key_min;
             unsigned int key_max;
-            unsigned int attack_mode;
-            unsigned int attack_shift;
-            unsigned int attack_step;
-            unsigned int decay_shift;
-            unsigned int sustain_level;
-            unsigned int sustain_mode;
-            unsigned int sustain_direction;
-            unsigned int sustain_shift;
-            unsigned int sustain_step;
-            unsigned int release_step;
-            unsigned int release_mode;
-            unsigned int release_shift;
-            unsigned int volume_multiplier;
+            unsigned int delay;
+            unsigned int attack;
+            unsigned int hold;
+            unsigned int decay;
+            unsigned int sustain;
+            unsigned int release;
+            unsigned int volume;
             unsigned int panning;
             char sample_source[128];
         } instrument_info;
-        sscanf(line, "%i;%i;%i;%i;%i;%i;%i;%i;%i;%i;%i;%i;%i;%i;%i;%i;%i;%s",
+        sscanf(line, "%i;%i;%i;%i;%i;%i;%i;%i;%i;%i;%i;%s",
             &instrument_info.instrument_id,
             &instrument_info.key_min,
             &instrument_info.key_max,
-            &instrument_info.attack_mode,
-            &instrument_info.attack_shift,
-            &instrument_info.attack_step,
-            &instrument_info.decay_shift,
-            &instrument_info.sustain_level,
-            &instrument_info.sustain_mode,
-            &instrument_info.sustain_direction,
-            &instrument_info.sustain_shift,
-            &instrument_info.sustain_step,
-            &instrument_info.release_step,
-            &instrument_info.release_mode,
-            &instrument_info.release_shift,
-            &instrument_info.volume_multiplier,
+            &instrument_info.delay,
+            &instrument_info.attack,
+            &instrument_info.hold,
+            &instrument_info.decay,
+            &instrument_info.sustain,
+            &instrument_info.release,
+            &instrument_info.volume,
             &instrument_info.panning,
             instrument_info.sample_source
         );
@@ -142,24 +133,17 @@ int main(int argc, char** argv) {
 
             // Instrument region
             inst_regions[n_samples] = (InstRegion){
-                .key_min = instrument_info.key_min,
-                .key_max = instrument_info.key_max,
-                .volume_multiplier = instrument_info.volume_multiplier,
                 .sample_start = sample_offsets[n_samples],
                 .sample_rate = wave.sample_rate,
-                .reg_adsr1 =
-                    instrument_info.attack_mode << 15 |
-                    instrument_info.attack_shift << 10 |
-                    instrument_info.attack_step << 8 |
-                    instrument_info.decay_shift << 4 |
-                    instrument_info.sustain_level << 0,
-                .reg_adsr2 =
-                    instrument_info.sustain_mode << 15 |
-                    instrument_info.sustain_direction << 14 |
-                    instrument_info.sustain_shift << 8 |
-                    instrument_info.sustain_step << 6 |
-                    instrument_info.release_mode << 5 |
-                    instrument_info.release_shift << 0,
+                .key_min = instrument_info.key_min,
+                .key_max = instrument_info.key_max,
+                .delay   = instrument_info.delay,
+                .attack  = instrument_info.attack,
+                .hold    = instrument_info.hold,
+                .decay   = instrument_info.decay,
+                .sustain = instrument_info.sustain,
+                .release = instrument_info.release,
+                .volume  = instrument_info.volume,
                 .panning = instrument_info.panning,
             };
 
