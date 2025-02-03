@@ -220,7 +220,7 @@ int main(int argc, char** argv) {
     uint32_t size_sample_data = sample_stack_cursor - sample_stack;
     uint32_t offset_inst_descs = 0;
     uint32_t offset_region_table = offset_inst_descs + size_inst_descs;
-    uint32_t offset_sample_data = offset_region_table + size_region_table;
+    uint32_t offset_sample_data = offset_region_table + size_region_table + 4; // + 4 for the format
 
     // Write the output file
     FILE* out_file = fopen(out_path, "wb");
