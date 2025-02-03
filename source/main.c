@@ -3,37 +3,56 @@
 #include <stdlib.h>
 
 typedef struct {
-    uint32_t sample_start;  // Offset (bytes) into sample data chunk. Can be written to SPU Sample Start Address |
-    uint32_t sample_rate;   // Sample rate (Hz) at MIDI key 60 (C5)                                              |
-    uint16_t delay;         // Delay stage length in milliseconds                                                |
-    uint16_t attack;        // Attack stage length in milliseconds                                               |
-    uint16_t hold;          // Hold stage length in milliseconds                                                 |
-    uint16_t decay;         // Decay stage length in milliseconds                                                |
-    uint16_t sustain;       // Sustain volume where 0 = 0.0 and 65535 = 1.0                                      |
-    uint16_t release;       // Release stage length in milliseconds                                              |
-    uint16_t volume;        // Panning for this region, 0 = left, 127 = middle, 254 = right                      |
-    uint16_t panning;       // Panning for this region, 0 = left, 127 = middle, 254 = right                      |
-    uint8_t key_min;        // Minimum MIDI key for this instrument region                                       |
+    uint32_t sample_start;  // Offset (bytes) into sample data chunk. Can be written to SPU Sample Start Address
+    uint32_t sample_rate;   // Sample rate (Hz) at MIDI key 60 (C5)
+    uint16_t delay;         // Delay stage length in milliseconds
+    uint16_t attack;        // Attack stage length in milliseconds
+    uint16_t hold;          // Hold stage length in milliseconds
+    uint16_t decay;         // Decay stage length in milliseconds
+    uint16_t sustain;       // Sustain volume where 0 = 0.0 and 65535 = 1.0
+    uint16_t release;       // Release stage length in milliseconds
+    uint16_t volume;        // Panning for this region, 0 = left, 127 = middle, 254 = right
+    uint16_t panning;       // Panning for this region, 0 = left, 127 = middle, 254 = right
+    uint8_t key_min;        // Minimum MIDI key for this instrument region
     uint8_t key_max;        // Maximum MIDI key for this instrument region         
 } InstRegion;
 
+typedef enum {
+    FORMAT_PSX,
+    FORMAT_PCM16,
+} Format;
+
 int main(int argc, char** argv) {
     // Validate input
-    if (argc != 3) {
-        printf("Usage: psx_soundfont_creator.exe <.csv> <.sbk>\n");
+    if (argc != 4) {
+        printf("Usage: psx_soundfont_creator.exe <.csv> <.sbk> <format>\n");
         exit(1);
     }
     const char* path = argv[1];
     const char* out_path = argv[2];
+    const char* format_str = argv[3];
 
-    // The PS1 has 512 KB of sound RAM, I allocate 380 KB for music instruments
-    uint8_t* scratch_buffer = malloc(380 * 1024);
-    uint8_t* sample_stack = malloc(380 * 1024); 
-    uint8_t* sample_stack_cursor = sample_stack;
+    // Parse format
+    size_t available_space = 0;
+    Format format;
+    if (strcmp(format_str, "psx") == 0) {
+        // The PS1 has 512 KB of sound RAM, I allocate 380 KB for music instruments
+        format = FORMAT_PSX;
+        available_space = 380 * 1024;
+    }
+    else if (strcmp(format_str, "pcm16") == 0) {
+        format = FORMAT_PCM16;
+        available_space = 256 * 1024 * 1024;
+    }
+
+    uint8_t* scratch_buffer = malloc(available_space);
+    uint8_t* sample_stack = malloc(available_space + 1);
+    sample_stack[0] = (uint8_t)format;
+    uint8_t* sample_stack_cursor = &sample_stack[1];
     uint32_t sample_offsets[1024] = {0};
     char* sample_names[1024] = { 0 };
     InstRegion inst_regions[1024];
-    int size_left = 380 * 1024;
+    int size_left = available_space;
     uint32_t n_samples = 0;
     uint16_t region_indices_per_instrument[256][16] = { 0 };
     uint16_t region_count_per_instrument[256] = { 0 };
@@ -117,7 +136,15 @@ int main(int argc, char** argv) {
         int sample_length;
         if (wave.loop_end != -1) sample_length = wave.loop_end + 1;
         else sample_length = wave.length;
-        int spu_sample_length = psx_audio_spu_encode_simple(wave.samples, sample_length, scratch_buffer, wave.loop_start);
+
+        int spu_sample_length = -1;
+        if (format == FORMAT_PSX) {
+            spu_sample_length = psx_audio_spu_encode_simple(wave.samples, sample_length, scratch_buffer, wave.loop_start);
+        }
+        else if (format == FORMAT_PCM16) {
+            spu_sample_length = wave.length;
+            memcpy(scratch_buffer, wave.samples, wave.length * sizeof(int16_t));
+        }
 
         // If the data fits, copy it over, and add it to the list
         if (spu_sample_length <= size_left) {
@@ -186,35 +213,25 @@ int main(int argc, char** argv) {
         inst_descs[i].n_regions = better_index - inst_descs[i].region_start_index;
     }
 
-    // Determine how big each section will be
+    // Determine where and how big each section will be
     const uint32_t size_header = 20;
     uint32_t size_inst_descs = 256 * sizeof(uint16_t) * 2;
     uint32_t size_region_table = n_samples * sizeof(InstRegion);
     uint32_t size_sample_data = sample_stack_cursor - sample_stack;
-
-    // Define offsets
     uint32_t offset_inst_descs = 0;
     uint32_t offset_region_table = offset_inst_descs + size_inst_descs;
     uint32_t offset_sample_data = offset_region_table + size_region_table;
 
-    // Create the output file
+    // Write the output file
     FILE* out_file = fopen(out_path, "wb");
-
-    // Write the file header
     fwrite("FSBK", 1, 4, out_file);
     fwrite(&n_samples, 1, 4, out_file);
     fwrite(&offset_inst_descs, 1, 4, out_file);
     fwrite(&offset_region_table, 1, 4, out_file);
     fwrite(&offset_sample_data, 1, 4, out_file);
     fwrite(&size_sample_data, 1, 4, out_file);
-
-    // Write instrument descriptions
     fwrite(inst_descs, sizeof(inst_descs[0]), 256, out_file);
-
-    // Write region table
     fwrite(regions, sizeof(regions[0]), n_samples, out_file);
-
-    // Write raw sample data
     fwrite(sample_stack, 1, sample_stack_cursor - sample_stack, out_file);
 
     return 0;
