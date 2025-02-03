@@ -46,9 +46,9 @@ int main(int argc, char** argv) {
     }
 
     uint8_t* scratch_buffer = malloc(available_space);
-    uint8_t* sample_stack = malloc(available_space + 1);
+    uint8_t* sample_stack = malloc(available_space + 4);
     sample_stack[0] = (uint8_t)format;
-    uint8_t* sample_stack_cursor = &sample_stack[1];
+    uint8_t* sample_stack_cursor = &sample_stack[4];
     uint32_t sample_offsets[1024] = {0};
     char* sample_names[1024] = { 0 };
     InstRegion inst_regions[1024];
