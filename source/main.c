@@ -5,6 +5,13 @@
 typedef struct {
     uint32_t sample_start;  // Offset (bytes) into sample data chunk. Can be written to SPU Sample Start Address
     uint32_t sample_rate;   // Sample rate (Hz) at MIDI key 60 (C5)
+    uint32_t loop_start;    // Offset (bytes) relative to sample start to return to after the end of a sample
+    uint16_t format;        // 0 = PSX SPU-ADPCM, 1 = Signed little-endian 16-bit PCM
+    uint16_t reserved;      // (unused padding for now)
+} SampleHeader;
+
+typedef struct {
+    uint16_t sample_index;  // Index into sample header array
     uint16_t delay;         // Delay stage length in milliseconds
     uint16_t attack;        // Attack stage length in milliseconds
     uint16_t hold;          // Hold stage length in milliseconds
@@ -46,12 +53,12 @@ int main(int argc, char** argv) {
     }
 
     uint8_t* scratch_buffer = malloc(available_space);
-    uint8_t* sample_stack = malloc(available_space + 4);
-    sample_stack[0] = (uint8_t)format;
-    uint8_t* sample_stack_cursor = &sample_stack[4];
+    uint8_t* sample_stack = malloc(available_space);
+    uint8_t* sample_stack_cursor = &sample_stack[0];
     uint32_t sample_offsets[1024] = {0};
     char* sample_names[1024] = { 0 };
     InstRegion inst_regions[1024];
+    SampleHeader sample_headers[1024];
     int size_left = available_space;
     uint32_t n_samples = 0;
     uint16_t region_indices_per_instrument[256][16] = { 0 };
@@ -158,20 +165,25 @@ int main(int argc, char** argv) {
             // Sample offset
             sample_offsets[n_samples] = sample_stack_cursor - sample_stack;
 
-            // Instrument region
-            inst_regions[n_samples] = (InstRegion){
+            // Sample header
+            sample_headers[n_samples] = (SampleHeader){
                 .sample_start = sample_offsets[n_samples],
                 .sample_rate = wave.sample_rate,
-                .key_min = instrument_info.key_min,
-                .key_max = instrument_info.key_max,
-                .delay   = instrument_info.delay,
-                .attack  = instrument_info.attack,
-                .hold    = instrument_info.hold,
-                .decay   = instrument_info.decay,
-                .sustain = instrument_info.sustain,
-                .release = instrument_info.release,
-                .volume  = instrument_info.volume,
-                .panning = instrument_info.panning,
+            };
+
+            // Instrument region
+            inst_regions[n_samples] = (InstRegion){
+                .sample_index = n_samples,
+                .key_min      = instrument_info.key_min,
+                .key_max      = instrument_info.key_max,
+                .delay        = instrument_info.delay,
+                .attack       = instrument_info.attack,
+                .hold         = instrument_info.hold,
+                .decay        = instrument_info.decay,
+                .sustain      = instrument_info.sustain,
+                .release      = instrument_info.release,
+                .volume       = instrument_info.volume,
+                .panning      = instrument_info.panning,
             };
 
             // Update instrument
@@ -217,10 +229,12 @@ int main(int argc, char** argv) {
     const uint32_t size_header = 20;
     uint32_t size_inst_descs = 256 * sizeof(uint16_t) * 2;
     uint32_t size_region_table = n_samples * sizeof(InstRegion);
+    uint32_t size_sample_headers = n_samples * sizeof(SampleHeader);
     uint32_t size_sample_data = sample_stack_cursor - sample_stack;
     uint32_t offset_inst_descs = 0;
     uint32_t offset_region_table = offset_inst_descs + size_inst_descs;
-    uint32_t offset_sample_data = offset_region_table + size_region_table + 4; // + 4 for the format
+    uint32_t offset_sample_headers = offset_region_table + size_region_table;
+    uint32_t offset_sample_data = offset_sample_headers + size_sample_headers;
 
     // Write the output file
     FILE* out_file = fopen(out_path, "wb");
@@ -228,10 +242,12 @@ int main(int argc, char** argv) {
     fwrite(&n_samples, 1, 4, out_file);
     fwrite(&offset_inst_descs, 1, 4, out_file);
     fwrite(&offset_region_table, 1, 4, out_file);
+    fwrite(&offset_sample_headers, 1, 4, out_file);
     fwrite(&offset_sample_data, 1, 4, out_file);
     fwrite(&size_sample_data, 1, 4, out_file);
     fwrite(inst_descs, sizeof(inst_descs[0]), 256, out_file);
     fwrite(regions, sizeof(regions[0]), n_samples, out_file);
+    fwrite(sample_headers, sizeof(sample_headers[0]), n_samples, out_file);
     fwrite(sample_stack, 1, sample_stack_cursor - sample_stack, out_file);
 
     return 0;
