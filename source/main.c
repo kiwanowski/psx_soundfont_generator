@@ -145,11 +145,14 @@ int main(int argc, char** argv) {
         else sample_length = wave.length;
 
         int spu_sample_length = -1;
+        size_t size_of_sample = 0;
         if (format == FORMAT_PSX) {
             spu_sample_length = psx_audio_spu_encode_simple(wave.samples, sample_length, scratch_buffer, wave.loop_start);
+            size_of_sample = 1;
         }
         else if (format == FORMAT_PCM16) {
             spu_sample_length = wave.length;
+            size_of_sample = sizeof(int16_t);
             memcpy(scratch_buffer, wave.samples, wave.length * sizeof(int16_t));
         }
 
@@ -169,8 +172,8 @@ int main(int argc, char** argv) {
             sample_headers[n_samples].format = format;
             sample_headers[n_samples].sample_start = sample_offsets[n_samples];
             sample_headers[n_samples].sample_rate = wave.sample_rate;
-            sample_headers[n_samples].loop_start = wave.loop_start;
-            sample_headers[n_samples].sample_length = (wave.loop_start == -1) ? (wave.length) : (wave.loop_end);
+            sample_headers[n_samples].loop_start = wave.loop_start * size_of_sample;
+            sample_headers[n_samples].sample_length = ((wave.loop_start == -1) ? (wave.length) : (wave.loop_end)) * size_of_sample;
 
             // Instrument region
             inst_regions[n_samples] = (InstRegion){
