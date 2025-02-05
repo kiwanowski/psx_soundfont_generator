@@ -4,10 +4,10 @@
 
 typedef struct {
     uint32_t sample_start;  // Offset (bytes) into sample data chunk. Can be written to SPU Sample Start Address
+    uint32_t sample_length; // Number of bytes in this sample. If `loop_start` is not equal to UINT32_MAX, this determines when to jump back to loop_start.
     uint32_t sample_rate;   // Sample rate (Hz) at MIDI key 60 (C5)
-    uint32_t loop_start;    // Offset (bytes) relative to sample start to return to after the end of a sample
-    uint16_t format;        // 0 = PSX SPU-ADPCM, 1 = Signed little-endian 16-bit PCM
-    uint16_t reserved;      // (unused padding for now)
+    uint32_t loop_start;    // Offset (bytes) relative to sample start to return to after the end of a sample. 
+    uint32_t format;        // 0 = PSX SPU-ADPCM, 1 = Signed little-endian 16-bit PCM
 } SampleHeader;
 
 typedef struct {
@@ -166,10 +166,11 @@ int main(int argc, char** argv) {
             sample_offsets[n_samples] = sample_stack_cursor - sample_stack;
 
             // Sample header
-            sample_headers[n_samples] = (SampleHeader){
-                .sample_start = sample_offsets[n_samples],
-                .sample_rate = wave.sample_rate,
-            };
+            sample_headers[n_samples].format = format;
+            sample_headers[n_samples].sample_start = sample_offsets[n_samples];
+            sample_headers[n_samples].sample_rate = wave.sample_rate;
+            sample_headers[n_samples].loop_start = wave.loop_start;
+            sample_headers[n_samples].sample_length = (wave.loop_start == -1) ? (wave.length) : (wave.loop_end);
 
             // Instrument region
             inst_regions[n_samples] = (InstRegion){
