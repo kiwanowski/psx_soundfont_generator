@@ -151,9 +151,9 @@ int main(int argc, char** argv) {
             size_of_sample = 1;
         }
         else if (format == FORMAT_PCM16) {
-            spu_sample_length = wave.length;
             size_of_sample = sizeof(int16_t);
-            memcpy(scratch_buffer, wave.samples, wave.length * sizeof(int16_t));
+            spu_sample_length = wave.length * size_of_sample;
+            memcpy(scratch_buffer, wave.samples, spu_sample_length);
         }
 
         // If the data fits, copy it over, and add it to the list
