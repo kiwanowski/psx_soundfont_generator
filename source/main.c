@@ -173,7 +173,7 @@ int main(int argc, char** argv) {
             sample_headers[n_samples].sample_start = sample_offsets[n_samples];
             sample_headers[n_samples].sample_rate = wave.sample_rate;
             sample_headers[n_samples].loop_start = wave.loop_start * size_of_sample;
-            sample_headers[n_samples].sample_length = ((wave.loop_start == -1) ? (wave.length) : (wave.loop_end)) * size_of_sample;
+            sample_headers[n_samples].sample_length = ((wave.loop_start < 0) ? (wave.length) : (wave.loop_end)) * size_of_sample;
 
             // Instrument region
             inst_regions[n_samples] = (InstRegion){
